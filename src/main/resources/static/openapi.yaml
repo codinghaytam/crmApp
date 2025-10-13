@@ -1,0 +1,815 @@
+openapi: 3.0.3
+info:
+  title: agentInterface API
+  version: 1.2.2
+  description: |
+    Unified ventes API. Use /api/ventes with a type discriminator (AU_VENDEUR/DU_VENDEUR).
+    Authentication uses email as username.
+    Webhooks are emitted on stock changes and ventes creation.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Application health
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+  /api/auth/login:
+    post:
+      tags: [Authentification]
+      summary: Connexion et émission d'un JWT (username = email)
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: JWT issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/auth/signup:
+    post:
+      tags: [Authentification]
+      summary: Créer un utilisateur et émettre un JWT
+      operationId: signup
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: Compte créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignupResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Rôle non autorisé par l'appelant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Utilisateur existe déjà
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/auth/logout:
+    post:
+      tags: [Authentification]
+      summary: Déconnexion (blacklist du JWT jusqu'à expiration)
+      operationId: logout
+      responses:
+        '204':
+          description: Déconnecté
+  /api/stock-brute/augmenter:
+    post:
+      tags: [Stock brut]
+      summary: Augmenter la quantité du stock brut pour un type
+      operationId: stockBrutAugmenter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MouvementRequest'
+      responses:
+        '200':
+          description: Quantité mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockQuantiteResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - bearerAuth: []
+  /api/stock-brute/diminuer:
+    post:
+      tags: [Stock brut]
+      summary: Diminuer la quantité du stock brut pour un type
+      operationId: stockBrutDiminuer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MouvementRequest'
+      responses:
+        '200':
+          description: Quantité mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockQuantiteResponse'
+        '400':
+          description: Validation error / Stock insuffisant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - bearerAuth: []
+  /api/stock-brute/quantite:
+    get:
+      tags: [Stock brut]
+      summary: Consulter la quantité pour un type de stock brut
+      operationId: stockBrutQuantite
+      parameters:
+        - in: query
+          name: type
+          required: true
+          schema:
+            $ref: '#/components/schemas/Type'
+      responses:
+        '200':
+          description: Quantité actuelle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockQuantiteResponse'
+      security:
+        - bearerAuth: []
+  /api/industrial/bouteilles:
+    post:
+      tags: [Agent industriel]
+      summary: Fabriquer une bouteille (consomme le stock brut du type choisi)
+      operationId: fabriquerBouteille
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BouteilleRequest'
+      responses:
+        '200':
+          description: Bouteille créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bouteille'
+        '400':
+          description: Stock insuffisant ou validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - bearerAuth: []
+  /api/commercial/types:
+    get:
+      tags: [Commercial]
+      summary: Lister les types de produit disponibles
+      operationId: listTypes
+      responses:
+        '200':
+          description: Liste des types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Type'
+      security:
+        - bearerAuth: []
+  /api/commercial/litrages:
+    get:
+      tags: [Commercial]
+      summary: Lister les litrages autorisés
+      operationId: listLitrages
+      responses:
+        '200':
+          description: Liste des litrages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: number
+                  format: double
+                  example: 1.0
+      security:
+        - bearerAuth: []
+  /api/commercial/bouteilles:
+    post:
+      tags: [Commercial]
+      summary: Créer une bouteille (consomme le stock brut)
+      operationId: creerBouteilleCommercial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BouteilleRequest'
+      responses:
+        '200':
+          description: Bouteille créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bouteille'
+        '400':
+          description: Stock insuffisant ou validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - bearerAuth: []
+  /api/commercial/boites:
+    post:
+      tags: [Commercial]
+      summary: Créer une boite (vérifie les ratios par litrage)
+      operationId: creerBoite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BoiteRequest'
+      responses:
+        '200':
+          description: Boite créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Boite'
+        '400':
+          description: Ratios invalides / validations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - bearerAuth: []
+  /api/emballage/chariots:
+    get:
+      tags: [Emballage]
+      summary: Lister les chariots d'emballage (ordre croissant d'id)
+      operationId: listerChariots
+      responses:
+        '200':
+          description: Liste des chariots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Chariot'
+    post:
+      tags: [Emballage]
+      summary: Ajouter un chariot vide
+      operationId: ajouterChariot
+      responses:
+        '200':
+          description: Nombre de chariots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chariots:
+                    type: integer
+  /api/emballage/summary:
+    get:
+      tags: [Emballage]
+      summary: Résumé de l'état d'emballage
+      operationId: resumeEmballage
+      responses:
+        '200':
+          description: Résumé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chariots: { type: integer }
+                  boitesEmballees: { type: integer }
+  /api/emballage/chariots/{index}:
+    delete:
+      tags: [Emballage]
+      summary: Supprimer un chariot par index
+      operationId: supprimerChariot
+      parameters:
+        - in: path
+          name: index
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Nombre de chariots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chariots:
+                    type: integer
+  /api/emballage/chariots/{index}/boites:
+    post:
+      tags: [Emballage]
+      summary: Ajouter une boite a un chariot
+      operationId: ajouterBoiteChariot
+      parameters:
+        - in: path
+          name: index
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AjouterBoiteRequest'
+      responses:
+        '200':
+          description: Nombre total de boites emballées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  boitesEmballees:
+                    type: integer
+  /api/emballage/chariots/{index}/boites/{indexBoite}:
+    delete:
+      tags: [Emballage]
+      summary: Retirer une boite d'un chariot
+      operationId: retirerBoiteChariot
+      parameters:
+        - in: path
+          name: index
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+        - in: path
+          name: indexBoite
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Nombre total de boites emballées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  boitesEmballees:
+                    type: integer
+  /api/webhooks/subscriptions:
+    post:
+      tags: [Webhooks]
+      summary: Créer une souscription webhook
+      operationId: createWebhookSub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubscriptionRequest'
+      responses:
+        '201':
+          description: Créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+    get:
+      tags: [Webhooks]
+      summary: Lister les souscriptions webhook actives
+      operationId: listWebhookSubs
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubscriptionResponse'
+  /api/webhooks/subscriptions/{id}:
+    delete:
+      tags: [Webhooks]
+      summary: Supprimer une souscription webhook
+      operationId: deleteWebhookSub
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Supprimé
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Type:
+      type: string
+      enum: [ZITBLAD, ASSELIA, kAULDA]
+    Litrage:
+      type: object
+      properties:
+        value:
+          type: number
+          format: double
+      required: [value]
+    Produit:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          $ref: '#/components/schemas/Type'
+        prix:
+          type: number
+          format: double
+    Bouteille:
+      allOf:
+        - $ref: '#/components/schemas/Produit'
+        - type: object
+          properties:
+            litrage:
+              $ref: '#/components/schemas/Litrage'
+    BouteilleRef:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+      required: [id]
+    Boite:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        type: { $ref: '#/components/schemas/Type' }
+        prix: { type: number, format: double }
+        quantite: { type: integer }
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [username, password]
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        roles:
+          type: array
+          items:
+            type: string
+      required: [token, expiresAt, roles]
+    MouvementRequest:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/Type'
+        quantite:
+          type: number
+          format: double
+      required: [type, quantite]
+    StockQuantiteResponse:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/Type'
+        quantite:
+          type: number
+          format: double
+      required: [type, quantite]
+    BouteilleRequest:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/Type'
+        litrage:
+          type: number
+          format: double
+        prix:
+          type: number
+          format: double
+      required: [type, litrage, prix]
+    BoiteRequest:
+      type: object
+      properties:
+        bouteilles:
+          type: array
+          description: Liste des bouteilles; seules les propriétés id sont nécessaires
+          items:
+            $ref: '#/components/schemas/BouteilleRef'
+        quantite:
+          type: integer
+          format: int32
+          description: Peut être 0 (calculé) ou égal au ratio imposé par le litrage
+        prix:
+          type: number
+          format: double
+      required: [bouteilles, prix]
+    AjouterBoiteRequest:
+      type: object
+      properties:
+        boite:
+          $ref: '#/components/schemas/Boite'
+      required: [boite]
+    Chariot:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        boites:
+          type: array
+          items:
+            $ref: '#/components/schemas/Boite'
+    VenteInput:
+      type: object
+      properties:
+        idClient:
+          type: string
+        Contenu:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProduitInput'
+      required: [idClient, Contenu]
+    ProduitInput:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/Type'
+        prix:
+          type: number
+          format: double
+      required: [type, prix]
+    Vente:
+      type: object
+      properties:
+        id:
+          type: string
+        idClient:
+          type: string
+        montantTotal:
+          type: number
+          format: double
+      required: [id, idClient, montantTotal]
+    VenteAuVendeurLigne:
+      type: object
+      required: [typeLigne, produitId, quantite, prixUnitaire]
+      properties:
+        typeLigne:
+          type: string
+          enum: [BOITE, BOUTEILLE]
+        produitId:
+          type: string
+        quantite:
+          type: integer
+          minimum: 1
+        prixUnitaire:
+          type: number
+          format: double
+        sousTotal:
+          type: number
+          format: double
+          readOnly: true
+    VenteDuVendeurLigne:
+      type: object
+      required: [produitId, quantite, prixUnitaire]
+      properties:
+        produitId:
+          type: string
+        quantite:
+          type: integer
+          minimum: 1
+        prixUnitaire:
+          type: number
+          format: double
+        sousTotal:
+          type: number
+          format: double
+          readOnly: true
+    VenteAuVendeur:
+      type: object
+      properties:
+        id:
+          type: string
+        dateVente:
+          type: string
+          format: date-time
+        vendeurId:
+          type: string
+        lignes:
+          type: array
+          items:
+            $ref: '#/components/schemas/VenteAuVendeurLigne'
+        montantTotal:
+          type: number
+          format: double
+    VenteDuVendeur:
+      type: object
+      properties:
+        id:
+          type: string
+        dateVente:
+          type: string
+          format: date-time
+        vendeurId:
+          type: string
+        lignes:
+          type: array
+          items:
+            $ref: '#/components/schemas/VenteDuVendeurLigne'
+        montantTotal:
+          type: number
+          format: double
+    EnregistrerVenteAuVendeurRequest:
+      type: object
+      required: [vendeurId, lignes]
+      properties:
+        vendeurId:
+          type: string
+        lignes:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/VenteAuVendeurLigne'
+    EnregistrerVenteDuVendeurRequest:
+      type: object
+      required: [lignes]
+      properties:
+        vendeurId:
+          type: string
+          description: Optionnel (si absent et rôle SELLER => identité courante)
+        lignes:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/VenteDuVendeurLigne'
+    WhoAmIResponse:
+      type: object
+      properties:
+        username:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+      required: [username, roles]
+    AdminStats:
+      type: object
+      properties:
+        stockBrut:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+          description: Quantité par type (clé = Type)
+        boitesEmballees:
+          type: integer
+          format: int32
+        ventesCount:
+          type: integer
+          format: int64
+      required: [stockBrut, boitesEmballees, ventesCount]
+    ChariotsCountResponse:
+      type: object
+      properties:
+        chariots:
+          type: integer
+          format: int64
+      required: [chariots]
+    BottlesPackedResponse:
+      type: object
+      properties:
+        boitesEmballees:
+          type: integer
+          format: int32
+      required: [boitesEmballees]
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+        path:
+          type: string
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+    SignupRequest:
+      type: object
+      required: [nom, prenom, email, password]
+      properties:
+        nom:
+          type: string
+        prenom:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        role:
+          type: string
+          description: Optionnel; par défaut Vendeur; Admin requis pour autre rôle
+    SignupResponse:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        username:
+          type: string
+          format: email
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        roles:
+          type: array
+          items:
+            type: string
+    CreateSubscriptionRequest:
+      type: object
+      properties:
+        targetUrl:
+          type: string
+          format: uri
+        eventTypes:
+          type: array
+          items:
+            type: string
+            enum: [STOCK_CHANGED, VENTE_AU_VENDEUR_CREATED, VENTE_DU_VENDEUR_CREATED]
+      required: [targetUrl]
+    SubscriptionResponse:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        targetUrl: { type: string, format: uri }
+        active: { type: boolean }
+        eventTypes:
+          type: array
+          items:
+            type: string
+            enum: [STOCK_CHANGED, VENTE_AU_VENDEUR_CREATED, VENTE_DU_VENDEUR_CREATED]

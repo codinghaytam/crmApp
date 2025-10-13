@@ -1,0 +1,488 @@
+openapi: 3.0.3
+info:
+  title: API Gestion Stock & Ventes
+  description: |
+    API pour la gestion du stock brut, la production (bouteilles/boîtes), l'emballage et les ventes unifiées.
+    - Vente.type = AU_VENDEUR (distribution commerciale, lignes: BOITE/BOUTEILLE)
+    - Vente.type = DU_VENDEUR (vente finale au client, lignes: BOUTEILLE)
+
+    Authentification:
+    - Login: POST /api/auth/login (username = email)
+    - Signup: POST /api/auth/signup (bootstrap: le premier utilisateur peut être Admin)
+    - Logout: POST /api/auth/logout (blacklist du JWT)
+
+    Webhooks: STOCK_CHANGED, VENTE_AU_VENDEUR_CREATED, VENTE_DU_VENDEUR_CREATED
+  version: 1.3.0
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+tags:
+  - name: Authentification
+  - name: Ventes
+  - name: Stock brut
+  - name: Agent industriel
+  - name: Commercial
+  - name: Emballage
+  - name: Webhooks
+paths:
+  /api/auth/login:
+    post:
+      tags: [Authentification]
+      summary: Connexion et émission d'un JWT (username = email)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: JWT émis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+  /api/auth/signup:
+    post:
+      tags: [Authentification]
+      summary: Créer un utilisateur et émettre un JWT
+      description: Si role est omis, Vendeur est utilisé. Seul un Admin peut créer un rôle non Vendeur.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: Compte créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignupResponse'
+  /api/auth/logout:
+    post:
+      tags: [Authentification]
+      summary: Déconnexion (blacklist du JWT)
+      responses:
+        '204':
+          description: Déconnecté
+  /api/ventes:
+    post:
+      tags: [Ventes]
+      summary: Créer une vente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VenteRequest'
+      responses:
+        '201':
+          description: Vente créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vente'
+    get:
+      tags: [Ventes]
+      summary: Lister les ventes
+      parameters:
+        - in: query
+          name: type
+          schema:
+            $ref: '#/components/schemas/VenteType'
+        - in: query
+          name: dateDebut
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: dateFin
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: vendeurId
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Liste des ventes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vente'
+  /api/ventes/{id}:
+    get:
+      tags: [Ventes]
+      summary: Obtenir une vente
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Vente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vente'
+  /api/emballage/chariots:
+    get:
+      tags: [Emballage]
+      summary: Lister les chariots d'emballage (ordre croissant d'id)
+      responses:
+        '200':
+          description: Liste des chariots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Chariot'
+      security:
+        - bearerAuth: []
+    post:
+      tags: [Emballage]
+      summary: Ajouter un chariot vide
+      responses:
+        '200':
+          description: Nombre de chariots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chariots:
+                    type: integer
+      security:
+        - bearerAuth: []
+  /api/emballage/summary:
+    get:
+      tags: [Emballage]
+      summary: Résumé de l'état d'emballage
+      responses:
+        '200':
+          description: Résumé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chariots:
+                    type: integer
+                  boitesEmballees:
+                    type: integer
+      security:
+        - bearerAuth: []
+  /api/emballage/chariots/{index}:
+    delete:
+      tags: [Emballage]
+      summary: Supprimer un chariot par index
+      parameters:
+        - in: path
+          name: index
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Nombre de chariots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chariots:
+                    type: integer
+      security:
+        - bearerAuth: []
+  /api/emballage/chariots/{index}/boites:
+    post:
+      tags: [Emballage]
+      summary: Ajouter une boite a un chariot
+      parameters:
+        - in: path
+          name: index
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AjouterBoiteRequest'
+      responses:
+        '200':
+          description: Nombre total de boites emballées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  boitesEmballees:
+                    type: integer
+      security:
+        - bearerAuth: []
+  /api/emballage/chariots/{index}/boites/{indexBoite}:
+    delete:
+      tags: [Emballage]
+      summary: Retirer une boite d'un chariot
+      parameters:
+        - in: path
+          name: index
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+        - in: path
+          name: indexBoite
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Nombre total de boites emballées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  boitesEmballees:
+                    type: integer
+      security:
+        - bearerAuth: []
+  /api/webhooks/subscriptions:
+    post:
+      tags: [Webhooks]
+      summary: Créer une souscription webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubscriptionRequest'
+      responses:
+        '201':
+          description: Créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+      security:
+        - bearerAuth: []
+    get:
+      tags: [Webhooks]
+      summary: Lister les souscriptions webhook actives
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubscriptionResponse'
+      security:
+        - bearerAuth: []
+  /api/webhooks/subscriptions/{id}:
+    delete:
+      tags: [Webhooks]
+      summary: Supprimer une souscription webhook
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Supprimé
+      security:
+        - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    VenteType:
+      type: string
+      enum: [AU_VENDEUR, DU_VENDEUR]
+    VenteRequest:
+      type: object
+      required: [type, vendeurId, lignes]
+      properties:
+        type:
+          $ref: '#/components/schemas/VenteType'
+        vendeurId:
+          type: string
+        lignes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LigneRequest'
+    LigneRequest:
+      type: object
+      required: [typeLigne, produitId, quantite, prixUnitaire]
+      properties:
+        typeLigne:
+          type: string
+          description: BOITE/BOUTEILLE pour AU_VENDEUR; BOUTEILLE pour DU_VENDEUR
+        produitId:
+          type: string
+        quantite:
+          type: integer
+          minimum: 1
+        prixUnitaire:
+          type: number
+          format: double
+    Vente:
+      type: object
+      properties:
+        id:
+          type: string
+        dateVente:
+          type: string
+          format: date-time
+        type:
+          $ref: '#/components/schemas/VenteType'
+        vendeurId:
+          type: integer
+          format: int64
+        montantTotal:
+          type: number
+          format: double
+        lignes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LigneRequest'
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        roles:
+          type: array
+          items:
+            type: string
+    SignupRequest:
+      type: object
+      required: [nom, prenom, email, password]
+      properties:
+        nom:
+          type: string
+        prenom:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        role:
+          type: string
+          description: Optionnel; par défaut Vendeur; Admin requis pour autre rôle
+    SignupResponse:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        username:
+          type: string
+          format: email
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        roles:
+          type: array
+          items:
+            type: string
+    AjouterBoiteRequest:
+      type: object
+      properties:
+        boite:
+          $ref: '#/components/schemas/Boite'
+      required: [boite]
+    Chariot:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        boites:
+          type: array
+          items:
+            $ref: '#/components/schemas/Boite'
+    Boite:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        type: { $ref: '#/components/schemas/Type' }
+        prix: { type: number, format: double }
+        quantite: { type: integer }
+    Bouteille:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        type: { $ref: '#/components/schemas/Type' }
+        prix: { type: number, format: double }
+        litrage:
+          type: object
+          properties:
+            value:
+              type: number
+              format: double
+    Type:
+      type: string
+      enum: [ZITBLAD, ASSELIA, kAULDA]
+    CreateSubscriptionRequest:
+      type: object
+      properties:
+        targetUrl:
+          type: string
+          format: uri
+        eventTypes:
+          type: array
+          items:
+            type: string
+            enum: [STOCK_CHANGED, VENTE_AU_VENDEUR_CREATED, VENTE_DU_VENDEUR_CREATED]
+      required: [targetUrl]
+    SubscriptionResponse:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        targetUrl: { type: string, format: uri }
+        active: { type: boolean }
+        eventTypes:
+          type: array
+          items:
+            type: string
+            enum: [STOCK_CHANGED, VENTE_AU_VENDEUR_CREATED, VENTE_DU_VENDEUR_CREATED]

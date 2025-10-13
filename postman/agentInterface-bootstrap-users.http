@@ -1,0 +1,86 @@
+# agentInterface - Bootstrap Users
+
+###
+# @name Auth - Login Admin
+POST {{BASE_URL}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{ADMIN_EMAIL}}",
+  "password": "{{ADMIN_PASSWORD}}"
+}
+
+> {%
+    // TODO: migrate to HTTP Client Response handler API
+    // pm.test("Admin login OK", function () {
+    //   pm.response.to.have.status(200);
+    //   const data = pm.response.json();
+    //   pm.expect(data).to.have.property('token');
+    //   pm.environment.set('ADMIN_TOKEN', data.token);
+    // });
+%}
+
+###
+# @name Signup - Admin (optional, ignores 409)
+POST {{BASE_URL}}/api/auth/signup
+Authorization: Bearer {{ADMIN_TOKEN}}
+Content-Type: application/json
+
+{
+  "nom": "Admin",
+  "prenom": "Root",
+  "email": "{{ADMIN_EMAIL}}",
+  "password": "{{ADMIN_PASSWORD}}",
+  "role": "Admin"
+}
+
+> {%
+    // TODO: migrate to HTTP Client Response handler API
+    // if (pm.response.code === 201) {
+    //   pm.test('Admin created', function () { pm.response.to.have.status(201); });
+    // } else if (pm.response.code === 409) {
+    //   pm.test('Admin already exists (409 ignored)', function () { pm.response.to.have.status(409); });
+    // } else {
+    //   pm.test('Unexpected status for admin signup', function () { pm.expect.fail('Status ' + pm.response.code); });
+    // }
+%}
+
+###
+# @name Signup - Agent Commercial
+POST {{BASE_URL}}/api/auth/signup
+Authorization: Bearer {{ADMIN_TOKEN}}
+Content-Type: application/json
+
+{
+  "nom": "Alice",
+  "prenom": "Sales",
+  "email": "agentc@example.com",
+  "password": "AgentC_Str0ng!",
+  "role": "Agent_commercial"
+}
+
+> {%
+    // TODO: migrate to HTTP Client Response handler API
+    // pm.test('Agent commercial created or exists', function () {
+    //   pm.expect([201,409]).to.include(pm.response.code);
+    // });
+%}
+
+###
+# @name Signup - Vendeur
+POST {{BASE_URL}}/api/auth/signup
+Content-Type: application/json
+
+{
+  "nom": "Victor",
+  "prenom": "Vendor",
+  "email": "vendeur@example.com",
+  "password": "Vend3ur_Str0ng!"
+}
+
+> {%
+    // TODO: migrate to HTTP Client Response handler API
+    // pm.test('Vendeur created or exists', function () {
+    //   pm.expect([201,409]).to.include(pm.response.code);
+    // });
+%}

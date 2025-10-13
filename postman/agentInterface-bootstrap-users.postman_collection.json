@@ -1,0 +1,150 @@
+{
+  "info": {
+    "name": "agentInterface - Bootstrap Users",
+    "_postman_id": "c42f7f5a-3f31-4ed8-8b9c-collection",
+    "description": "Logs in as Admin and creates Agent Commercial + Vendeur users via /api/auth/signup",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth - Login Admin",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/auth/login",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{ADMIN_EMAIL}}\",\n  \"password\": \"{{ADMIN_PASSWORD}}\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Admin login OK\", function () {",
+              "  pm.response.to.have.status(200);",
+              "  const data = pm.response.json();",
+              "  pm.expect(data).to.have.property('token');",
+              "  pm.environment.set('ADMIN_TOKEN', data.token);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Signup - Admin (optional, ignores 409)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/auth/signup",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nom\": \"Admin\",\n  \"prenom\": \"Root\",\n  \"email\": \"{{ADMIN_EMAIL}}\",\n  \"password\": \"{{ADMIN_PASSWORD}}\",\n  \"role\": \"Admin\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  pm.test('Admin created', function () { pm.response.to.have.status(201); });",
+              "} else if (pm.response.code === 409) {",
+              "  pm.test('Admin already exists (409 ignored)', function () { pm.response.to.have.status(409); });",
+              "} else {",
+              "  pm.test('Unexpected status for admin signup', function () { pm.expect.fail('Status ' + pm.response.code); });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Signup - Agent Commercial",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/auth/signup",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nom\": \"Alice\",\n  \"prenom\": \"Sales\",\n  \"email\": \"agentc@example.com\",\n  \"password\": \"AgentC_Str0ng!\",\n  \"role\": \"Agent_commercial\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Agent commercial created or exists', function () {",
+              "  pm.expect([201,409]).to.include(pm.response.code);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Signup - Vendeur",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/auth/signup",
+          "host": ["{{BASE_URL}}"],
+          "path": ["api", "auth", "signup"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nom\": \"Victor\",\n  \"prenom\": \"Vendor\",\n  \"email\": \"vendeur@example.com\",\n  \"password\": \"Vend3ur_Str0ng!\"\n}"
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Vendeur created or exists', function () {",
+              "  pm.expect([201,409]).to.include(pm.response.code);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ],
+  "event": [],
+  "variable": []
+}
+
