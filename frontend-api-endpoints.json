@@ -1,0 +1,409 @@
+{
+  "$schema": "https://example.com/schemas/frontend-agent-endpoints.schema.json",
+  "version": "1.0.0",
+  "generatedAt": "2025-11-03T00:00:00Z",
+  "notes": [
+    "All authenticated requests must include the HTTP header: Authorization: Bearer <JWT>.",
+    "Unauthenticated routes: /api/auth/**, /api/health, and Swagger docs (/v3/api-docs/**, /swagger-ui.html, /swagger-ui/**).",
+    "Dates in query params use ISO format yyyy-MM-dd.",
+    "Enum values are case-sensitive and must match exactly as declared.",
+    "CORS is permissive (all origins) per security config; credentials are allowed.",
+    "Username equals user's email in this application."
+  ],
+  "enums": {
+    "Role": ["Admin", "Agent_commercial", "Agent_industrielle", "Vendeur"],
+    "Type": ["ZITBLAD", "ASSELIA", "kAULDA"],
+    "VenteType": ["AU_VENDEUR", "DU_VENDEUR"],
+    "EventType": ["STOCK_CHANGED", "VENTE_AU_VENDEUR_CREATED", "VENTE_DU_VENDEUR_CREATED"]
+  },
+  "auth": {
+    "login": {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "authRequired": false,
+      "summary": "Connexion et émission d'un JWT (username = email)",
+      "body": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": {"type": "string", "description": "Email de l'utilisateur"},
+          "password": {"type": "string"}
+        }
+      },
+      "response": {
+        "type": "object",
+        "properties": {
+          "token": {"type": "string"},
+          "expiresAt": {"type": "string", "format": "date-time"},
+          "roles": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "signup": {
+      "method": "POST",
+      "path": "/api/auth/signup",
+      "authRequired": false,
+      "summary": "Créer un utilisateur et émettre un JWT",
+      "notes": ["Service peut restreindre la création de rôles non Vendeur aux Admins."],
+      "body": {
+        "type": "object",
+        "required": ["nom", "prenom", "email", "password", "role"],
+        "properties": {
+          "nom": {"type": "string"},
+          "prenom": {"type": "string"},
+          "email": {"type": "string", "format": "email"},
+          "password": {"type": "string"},
+          "role": {"type": "string", "enum": ["Admin", "Agent_commercial", "Agent_industrielle", "Vendeur"]}
+        }
+      },
+      "response": {
+        "type": "object",
+        "properties": {
+          "userId": {"type": "integer"},
+          "username": {"type": "string"},
+          "token": {"type": "string"},
+          "expiresAt": {"type": "string", "format": "date-time"},
+          "roles": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "logout": {
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "authRequired": true,
+      "summary": "Déconnexion (blacklist du JWT côté serveur)",
+      "headers": {"Authorization": "Bearer <token>"},
+      "body": null,
+      "response": {"status": 204}
+    }
+  },
+  "endpoints": [
+    {
+      "id": "health.status",
+      "method": "GET",
+      "path": "/api/health",
+      "authRequired": false,
+      "summary": "Vérifier l'état de l'application",
+      "query": {},
+      "pathVars": {},
+      "body": null,
+      "response": {"type": "object", "properties": {"status": {"type": "string"}}}
+    },
+    {
+      "id": "admin.whoami",
+      "method": "GET",
+      "path": "/api/admin/whoami",
+      "authRequired": true,
+      "allowedRoles": ["Admin"],
+      "summary": "Informations sur l'utilisateur courant",
+      "query": {},
+      "pathVars": {},
+      "body": null,
+      "response": {"type": "object", "properties": {"username": {"type": "string"}, "roles": {"type": "array", "items": {"type": "string"}}}}
+    },
+    {
+      "id": "admin.stats",
+      "method": "GET",
+      "path": "/api/admin/stats",
+      "authRequired": true,
+      "allowedRoles": ["Admin"],
+      "summary": "Statistiques globales",
+      "query": {},
+      "pathVars": {},
+      "body": null,
+      "response": {"type": "object"}
+    },
+    {
+      "id": "commercial.types",
+      "method": "GET",
+      "path": "/api/commercial/types",
+      "authRequired": true,
+      "allowedRoles": ["Agent_commercial", "Admin"],
+      "summary": "Lister les types de produit disponibles",
+      "query": {},
+      "pathVars": {},
+      "body": null,
+      "response": {"type": "array", "items": {"type": "string"}}
+    },
+    {
+      "id": "commercial.litrages",
+      "method": "GET",
+      "path": "/api/commercial/litrages",
+      "authRequired": true,
+      "allowedRoles": ["Agent_commercial", "Admin"],
+      "summary": "Lister les litrages autorisés",
+      "query": {},
+      "pathVars": {},
+      "body": null,
+      "response": {"type": "array", "items": {"type": "number"}}
+    },
+    {
+      "id": "commercial.createBouteille",
+      "method": "POST",
+      "path": "/api/commercial/bouteilles",
+      "authRequired": true,
+      "allowedRoles": ["Agent_commercial", "Admin"],
+      "summary": "Créer une bouteille",
+      "body": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {"type": "string", "enum": ["ZITBLAD", "ASSELIA", "kAULDA"]},
+          "litrage": {"type": "number"},
+          "prix": {"type": "number"}
+        }
+      },
+      "response": {"type": "object", "ref": "model.Bouteille"}
+    },
+    {
+      "id": "commercial.createBoite",
+      "method": "POST",
+      "path": "/api/commercial/boites",
+      "authRequired": true,
+      "allowedRoles": ["Agent_commercial", "Admin"],
+      "summary": "Créer une boite",
+      "body": {
+        "type": "object",
+        "required": ["bouteilles", "quantite", "prix"],
+        "properties": {
+          "bouteilles": {"type": "array", "items": {"type": "object", "ref": "model.Bouteille"}},
+          "quantite": {"type": "integer", "minimum": 0},
+          "prix": {"type": "number"}
+        }
+      },
+      "response": {"type": "object", "ref": "model.Boite"}
+    },
+    {
+      "id": "emballage.addChariot",
+      "method": "POST",
+      "path": "/api/emballage/chariots",
+      "authRequired": true,
+      "allowedRoles": ["Agent_industrielle", "Admin"],
+      "summary": "Ajouter un chariot vide",
+      "body": null,
+      "response": {"type": "object", "properties": {"chariots": {"type": "integer"}}}
+    },
+    {
+      "id": "emballage.deleteChariot",
+      "method": "DELETE",
+      "path": "/api/emballage/chariots/{index}",
+      "authRequired": true,
+      "allowedRoles": ["Agent_industrielle", "Admin"],
+      "summary": "Supprimer un chariot par index",
+      "pathVars": {"index": {"type": "integer", "minimum": 0}},
+      "response": {"type": "object", "properties": {"chariots": {"type": "integer"}}}
+    },
+    {
+      "id": "emballage.addBoiteToChariot",
+      "method": "POST",
+      "path": "/api/emballage/chariots/{index}/boites",
+      "authRequired": true,
+      "allowedRoles": ["Agent_industrielle", "Admin"],
+      "summary": "Ajouter une boite à un chariot",
+      "pathVars": {"index": {"type": "integer", "minimum": 0}},
+      "body": {"type": "object", "required": ["boite"], "properties": {"boite": {"type": "object", "ref": "model.Boite"}}},
+      "response": {"type": "object", "properties": {"boitesEmballees": {"type": "integer"}}}
+    },
+    {
+      "id": "emballage.removeBoiteFromChariot",
+      "method": "DELETE",
+      "path": "/api/emballage/chariots/{index}/boites/{indexBoite}",
+      "authRequired": true,
+      "allowedRoles": ["Agent_industrielle", "Admin"],
+      "summary": "Retirer une boite d'un chariot",
+      "pathVars": {"index": {"type": "integer", "minimum": 0}, "indexBoite": {"type": "integer", "minimum": 0}},
+      "response": {"type": "object", "properties": {"boitesEmballees": {"type": "integer"}}}
+    },
+    {
+      "id": "emballage.listChariots",
+      "method": "GET",
+      "path": "/api/emballage/chariots",
+      "authRequired": true,
+      "allowedRoles": ["Agent_industrielle", "Admin"],
+      "summary": "Lister les chariots (ordre croissant d'id)",
+      "response": {"type": "array", "items": {"type": "object", "ref": "model.Chariot"}}
+    },
+    {
+      "id": "emballage.summary",
+      "method": "GET",
+      "path": "/api/emballage/summary",
+      "authRequired": true,
+      "allowedRoles": ["Agent_industrielle", "Admin"],
+      "summary": "Résumé de l'état d'emballage",
+      "response": {"type": "object"}
+    },
+    {
+      "id": "industrial.fabriquerBouteille",
+      "method": "POST",
+      "path": "/api/industrial/bouteilles",
+      "authRequired": true,
+      "allowedRoles": ["Agent_industrielle", "Admin"],
+      "summary": "Fabriquer une bouteille (consomme stock brut)",
+      "body": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {"type": "string", "enum": ["ZITBLAD", "ASSELIA", "kAULDA"]},
+          "litrage": {"type": "number"},
+          "prix": {"type": "number"}
+        }
+      },
+      "response": {"type": "object", "ref": "model.Bouteille"}
+    },
+    {
+      "id": "stockBrut.augmenter",
+      "method": "POST",
+      "path": "/api/stock-brute/augmenter",
+      "authRequired": true,
+      "allowedRoles": ["Agent_industrielle", "Admin"],
+      "summary": "Augmenter la quantité du stock brut pour un type",
+      "body": {
+        "type": "object",
+        "required": ["type", "quantite"],
+        "properties": {
+          "type": {"type": "string", "enum": ["ZITBLAD", "ASSELIA", "kAULDA"]},
+          "quantite": {"type": "string", "format": "decimal"}
+        }
+      },
+      "response": {"type": "object", "properties": {"type": {"type": "string"}, "quantite": {"type": "string", "format": "decimal"}}}
+    },
+    {
+      "id": "stockBrut.diminuer",
+      "method": "POST",
+      "path": "/api/stock-brute/diminuer",
+      "authRequired": true,
+      "allowedRoles": ["Agent_industrielle", "Admin"],
+      "summary": "Diminuer la quantité du stock brut pour un type",
+      "body": {
+        "type": "object",
+        "required": ["type", "quantite"],
+        "properties": {
+          "type": {"type": "string", "enum": ["ZITBLAD", "ASSELIA", "kAULDA"]},
+          "quantite": {"type": "string", "format": "decimal"}
+        }
+      },
+      "response": {"type": "object", "properties": {"type": {"type": "string"}, "quantite": {"type": "string", "format": "decimal"}}}
+    },
+    {
+      "id": "stockBrut.quantite",
+      "method": "GET",
+      "path": "/api/stock-brute/quantite",
+      "authRequired": true,
+      "allowedRoles": ["Agent_industrielle", "Admin"],
+      "summary": "Consulter la quantité pour un type de stock brut",
+      "query": {"type": {"type": "string", "enum": ["ZITBLAD", "ASSELIA", "kAULDA"], "required": true}},
+      "response": {"type": "object", "properties": {"type": {"type": "string"}, "quantite": {"type": "string", "format": "decimal"}}}
+    },
+    {
+      "id": "ventes.create",
+      "method": "POST",
+      "path": "/api/ventes",
+      "authRequired": true,
+      "allowedRoles": ["Admin", "Agent_commercial", "Vendeur"],
+      "summary": "Créer une vente unifiée",
+      "body": {
+        "type": "object",
+        "required": ["type", "vendeurId", "lignes"],
+        "properties": {
+          "type": {"type": "string", "enum": ["AU_VENDEUR", "DU_VENDEUR"]},
+          "vendeurId": {"type": "string"},
+          "lignes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["typeLigne", "produitId", "quantite", "prixUnitaire"],
+              "properties": {
+                "typeLigne": {"type": "string", "description": "\"BOITE\" ou \"BOUTEILLE\" selon le type de vente"},
+                "produitId": {"type": "string"},
+                "quantite": {"type": "integer", "minimum": 1},
+                "prixUnitaire": {"type": "number", "minimum": 0}
+              }
+            }
+          }
+        }
+      },
+      "response": {"type": "object", "ref": "model.Vente"},
+      "validationNotes": [
+        "AU_VENDEUR: lignes peuvent référencer BOITE ou BOUTEILLE (au moins une ligne)",
+        "DU_VENDEUR: lignes BOUTEILLE uniquement"
+      ]
+    },
+    {
+      "id": "ventes.list",
+      "method": "GET",
+      "path": "/api/ventes",
+      "authRequired": true,
+      "allowedRoles": ["Admin", "Agent_commercial", "Vendeur"],
+      "summary": "Lister les ventes",
+      "query": {
+        "type": {"type": "string", "enum": ["AU_VENDEUR", "DU_VENDEUR"], "required": false},
+        "dateDebut": {"type": "string", "format": "date", "required": false},
+        "dateFin": {"type": "string", "format": "date", "required": false},
+        "vendeurId": {"type": "string", "required": false}
+      },
+      "response": {"type": "array", "items": {"type": "object", "ref": "model.Vente"}}
+    },
+    {
+      "id": "ventes.getById",
+      "method": "GET",
+      "path": "/api/ventes/{id}",
+      "authRequired": true,
+      "allowedRoles": ["Admin", "Agent_commercial", "Vendeur"],
+      "summary": "Obtenir une vente par ID",
+      "pathVars": {"id": {"type": "string"}},
+      "response": {"type": "object", "ref": "model.Vente"}
+    },
+    {
+      "id": "webhooks.createSubscription",
+      "method": "POST",
+      "path": "/api/webhooks/subscriptions",
+      "authRequired": true,
+      "allowedRoles": ["Admin"],
+      "summary": "Créer une souscription webhook",
+      "body": {
+        "type": "object",
+        "required": ["targetUrl"],
+        "properties": {
+          "targetUrl": {"type": "string", "format": "uri"},
+          "eventTypes": {"type": "array", "items": {"type": "string", "enum": ["STOCK_CHANGED", "VENTE_AU_VENDEUR_CREATED", "VENTE_DU_VENDEUR_CREATED"]}, "description": "Omettre ou vide => tous les événements"}
+        }
+      },
+      "response": {"type": "object", "properties": {"id": {"type": "integer"}, "targetUrl": {"type": "string", "format": "uri"}, "active": {"type": "boolean"}, "eventTypes": {"type": "array", "items": {"type": "string"}}}}
+    },
+    {
+      "id": "webhooks.listSubscriptions",
+      "method": "GET",
+      "path": "/api/webhooks/subscriptions",
+      "authRequired": true,
+      "allowedRoles": ["Admin"],
+      "summary": "Lister les souscriptions webhook actives",
+      "response": {"type": "array", "items": {"type": "object", "properties": {"id": {"type": "integer"}, "targetUrl": {"type": "string", "format": "uri"}, "active": {"type": "boolean"}, "eventTypes": {"type": "array", "items": {"type": "string"}}}}}
+    },
+    {
+      "id": "webhooks.deleteSubscription",
+      "method": "DELETE",
+      "path": "/api/webhooks/subscriptions/{id}",
+      "authRequired": true,
+      "allowedRoles": ["Admin"],
+      "summary": "Supprimer une souscription webhook",
+      "pathVars": {"id": {"type": "integer"}},
+      "response": {"status": 204}
+    }
+  ],
+  "headers": {
+    "authorization": {
+      "name": "Authorization",
+      "description": "Bearer <JWT>",
+      "appliesTo": [
+        "/api/admin/**",
+        "/api/industrial/**",
+        "/api/commercial/**",
+        "/api/emballage/**",
+        "/api/stock-brute/**",
+        "/api/ventes/**",
+        "/api/webhooks/**"
+      ]
+    }
+  }
+}
+
