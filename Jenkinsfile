@@ -16,7 +16,7 @@ pipeline {
   parameters {
     string(name: 'BRANCH', defaultValue: 'main', description: 'Git branch to build')
     string(name: 'BACKEND_HOST', defaultValue: '3.253.33.66', description: 'Hostname or IP of backend VM (required)')
-    string(name: 'FRONTEND_HOST', defaultValue: '"3.250.8.136', description: 'Hostname or IP of frontend VM (required)')
+    string(name: 'FRONTEND_HOST', defaultValue: '3.250.8.136', description: 'Hostname or IP of frontend VM (required)')
     booleanParam(name: 'SKIP_FRONTEND_BUILD', defaultValue: false, description: 'Skip building frontend (if packaged separately)')
     // Credential IDs provided at job run time (avoid static secret IDs in environment)
     string(name: 'BACKEND_SSH_CRED_ID', defaultValue: 'deploy-backend-key', description: 'Jenkins credential id for backend SSH (SSH Username with private key)')
@@ -128,7 +128,7 @@ EOD
     }
 
     stage('Deploy Frontend') {
-      when { allOf { expression { return !params.SKIP_FRONTEND_BUILD }, expression { return params.FRONTEND_HOST?.trim() != '' } } }
+      when { allOf { expression { return !params.SKIP_FRONTEND_BUILD } expression { return params.FRONTEND_HOST?.trim() != '' } } }
       steps {
         echo "Deploying frontend to ${params.FRONTEND_HOST}"
         withCredentials([

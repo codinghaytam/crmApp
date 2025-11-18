@@ -1,0 +1,286 @@
+{
+  "baseUrl": "/api",
+  "auth": {
+    "authorizationHeader": "Authorization: Bearer <token>",
+    "usernameIsEmail": true,
+    "rolesEnumLocation": "com.jit.agentInterface.enums.Role",
+    "roles": ["Admin","Agent_commercial","Agent_industrielle","Vendeur"]
+  },
+  "webhookEvents": [
+    "STOCK_CHANGED",
+    "VENTE_AU_VENDEUR_CREATED",
+    "VENTE_DU_VENDEUR_CREATED"
+  ],
+  "endpoints": [
+    {
+      "group": "Authentification",
+      "path": "/api/auth/login",
+      "method": "POST",
+      "authRequired": false,
+      "description": "Login (username is email). Returns JWT token, expiry and roles.",
+      "request": {
+        "contentType": "application/json",
+        "schema": {
+          "username": "string (email)",
+          "password": "string"
+        },
+        "example": {"username": "admin@example.com","password":"secret"}
+      },
+      "response": {
+        "200": {"token":"string","expiresAt":"ISO-8601 instant","roles":["ROLE"]}
+      }
+    },
+    {
+      "group": "Authentification",
+      "path": "/api/auth/signup",
+      "method": "POST",
+      "authRequired": true,
+      "rolesAllowed": ["Admin"],
+      "description": "Create user and emit JWT. Admin must create non-Vendeur roles.",
+      "request": {
+        "contentType": "application/json",
+        "schema": {"nom":"string","prenom":"string","email":"string (unique)","password":"string","role":"one of Role enum"},
+        "example": {"nom":"Dupont","prenom":"Jean","email":"vendeur@example.com","password":"pwd","role":"Vendeur"}
+      },
+      "response": {"201": {"userId":"long","username":"string","token":"string","expiresAt":"ISO-8601","roles":["ROLE"]}}
+    },
+    {
+      "group": "Authentification",
+      "path": "/api/auth/logout",
+      "method": "POST",
+      "authRequired": true,
+      "description": "Logout: server-side token blacklist until expiry. Send Authorization header.",
+      "request": {"contentType":"none (header-based)"},
+      "response": {"204": null}
+    },
+    {
+      "group": "Health",
+      "path": "/api/health",
+      "method": "GET",
+      "authRequired": false,
+      "description": "Simple health check",
+      "response": {"200": {"status":"UP"}}
+    },
+    {
+      "group": "Stock brut",
+      "path": "/api/stock-brute/augmenter",
+      "method": "POST",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_industrielle","Admin"],
+      "description": "Increase raw stock for a given product type (industrial agent). Emits STOCK_CHANGED webhook.",
+      "request": {"contentType":"application/json","schema": {"type":"one of com.jit.agentInterface.enums.Type","quantite":"decimal (BigDecimal)"},"example": {"type":"ZITBLAD","quantite":100}},
+      "response": {"200": {"type":"enum","quantite":"new quantity as BigDecimal"}}
+    },
+    {
+      "group": "Stock brut",
+      "path": "/api/stock-brute/diminuer",
+      "method": "POST",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_industrielle","Admin"],
+      "description": "Decrease raw stock. Emits STOCK_CHANGED webhook.",
+      "request": {"contentType":"application/json","schema": {"type":"enum","quantite":"decimal"},"example": {"type":"ASSELIA","quantite":10}},
+      "response": {"200": {"type":"enum","quantite":"new quantity"}}
+    },
+    {
+      "group": "Stock brut",
+      "path": "/api/stock-brute/quantite",
+      "method": "GET",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_industrielle","Admin"],
+      "description": "Get current quantity for a raw stock type",
+      "queryParams": [{"name":"type","required":true,"type":"enum Type"}],
+      "response": {"200": {"type":"enum","quantite":"BigDecimal"}}
+    },
+    {
+      "group": "Agent industriel",
+      "path": "/api/industrial/bouteilles",
+      "method": "POST",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_industrielle","Admin"],
+      "description": "Create/fill a Bouteille consuming raw stock for the chosen type and litrage. Emits STOCK_CHANGED webhook.",
+      "request": {"contentType":"application/json","schema": {"type":"enum Type","litrage":"1|0.5|2|5 (double)","prix":"double"},"example": {"type":"ZITBLAD","litrage":1.0,"prix":2.5}},
+      "response": {"200": {"Bouteille": {"id":"long","type":"Type","prix":"double","litrage":{"value":"double"}}}}
+    },
+    {
+      "group": "Commercial",
+      "path": "/api/commercial/types",
+      "method": "GET",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_commercial","Admin"],
+      "description": "List product Type enum names",
+      "response": {"200": ["Type names as strings"]}
+    },
+    {
+      "group": "Commercial",
+      "path": "/api/commercial/litrages",
+      "method": "GET",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_commercial","Admin"],
+      "description": "List allowed litrages",
+      "response": {"200": [1,0.5,2,5]}
+    },
+    {
+      "group": "Commercial",
+      "path": "/api/commercial/bouteilles",
+      "method": "POST",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_commercial","Admin"],
+      "description": "Create a Bouteille (commercial agent). This delegates to productService.createBouteille which must enforce raw stock consumption.",
+      "request": {"contentType":"application/json","schema": {"type":"Type","litrage":"double","prix":"double"},"example": {"type":"ASSELIA","litrage":0.5,"prix":1.2}},
+      "response": {"200": {"Bouteille model"}}
+    },
+    {
+      "group": "Commercial",
+      "path": "/api/commercial/boites",
+      "method": "POST",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_commercial","Admin"],
+      "description": "Create a Boite from a list of Bouteille entries and metadata. ProductService.createBoite should check availability and consume bouteilles. Emits STOCK_CHANGED webhook.",
+      "request": {"contentType":"application/json","schema": {"bouteilles":"array of Bouteille objects (id optional)","quantite":"int","prix":"double"}},
+      "response": {"200": {"Boite model"}}
+    },
+    {
+      "group": "Emballage",
+      "path": "/api/emballage/chariots",
+      "method": "POST",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_industrielle","Admin"],
+      "description": "Add empty chariot",
+      "response": {"200": {"chariots":"count"}}
+    },
+    {
+      "group": "Emballage",
+      "path": "/api/emballage/chariots/{index}",
+      "method": "DELETE",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_industrielle","Admin"],
+      "pathParams": [{"name":"index","type":"int","min":0}],
+      "description": "Remove a chariot by index",
+      "response": {"200": {"chariots":"count"}}
+    },
+    {
+      "group": "Emballage",
+      "path": "/api/emballage/chariots/{index}/boites",
+      "method": "POST",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_industrielle","Admin"],
+      "pathParams": [{"name":"index","type":"int","min":0}],
+      "request": {"contentType":"application/json","schema": {"boite":"Boite object"}},
+      "response": {"200": {"boitesEmballees":"int"}}
+    },
+    {
+      "group": "Emballage",
+      "path": "/api/emballage/chariots/{index}/boites/{indexBoite}",
+      "method": "DELETE",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_industrielle","Admin"],
+      "pathParams": [{"name":"index","type":"int","min":0},{"name":"indexBoite","type":"int","min":0}],
+      "response": {"200": {"boitesEmballees":"int"}}
+    },
+    {
+      "group": "Emballage",
+      "path": "/api/emballage/chariots",
+      "method": "GET",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_industrielle","Admin"],
+      "response": {"200": ["Chariot objects ordered by id"]}
+    },
+    {
+      "group": "Emballage",
+      "path": "/api/emballage/summary",
+      "method": "GET",
+      "authRequired": true,
+      "rolesAllowed": ["Agent_industrielle","Admin"],
+      "response": {"200": {"summary keys":"values"}}
+    },
+    {
+      "group": "Webhooks",
+      "path": "/api/webhooks/subscriptions",
+      "method": "POST",
+      "authRequired": true,
+      "rolesAllowed": ["Admin"],
+      "description": "Create webhook subscription to receive events. If eventTypes empty => all events.",
+      "request": {"contentType":"application/json","schema": {"targetUrl":"string (valid URL)","eventTypes":"array of EventType enums (optional)"},"example": {"targetUrl":"https://app.example.com/webhook","eventTypes":["STOCK_CHANGED"]}},
+      "response": {"201": {"id":"long","targetUrl":"string","active":"boolean","eventTypes":["EventType"]}}
+    },
+    {
+      "group": "Webhooks",
+      "path": "/api/webhooks/subscriptions",
+      "method": "GET",
+      "authRequired": true,
+      "rolesAllowed": ["Admin"],
+      "response": {"200": ["SubscriptionResponse"]}
+    },
+    {
+      "group": "Webhooks",
+      "path": "/api/webhooks/subscriptions/{id}",
+      "method": "DELETE",
+      "authRequired": true,
+      "rolesAllowed": ["Admin"],
+      "pathParams": [{"name":"id","type":"long"}],
+      "response": {"204": null}
+    },
+    {
+      "group": "Ventes",
+      "path": "/api/ventes",
+      "method": "POST",
+      "authRequired": true,
+      "rolesAllowed": ["Admin","Agent_commercial","Vendeur"],
+      "description": "Create a unified sale. Request includes VenteType (AU_VENDEUR or DU_VENDEUR), vendeurId and list of lignes. Service must enforce content rules: AU_VENDEUR: lignes can be BOITE and/or BOUTEILLE; DU_VENDEUR: lignes only BOUTEILLE. Emits VENTE_AU_VENDEUR_CREATED or VENTE_DU_VENDEUR_CREATED accordingly.",
+      "request": {"contentType":"application/json","schema": {"type":"VenteType","vendeurId":"string (user id)","lignes":[{"typeLigne":"string (BOITE|BOUTEILLE)","produitId":"string","quantite":"int >=1","prixUnitaire":"double"}]},
+      "example": {"type":"AU_VENDEUR","vendeurId":"123","lignes":[{"typeLigne":"BOITE","produitId":"45","quantite":2,"prixUnitaire":50}]}}
+    },
+    {
+      "group": "Ventes",
+      "path": "/api/ventes",
+      "method": "GET",
+      "authRequired": true,
+      "rolesAllowed": ["Admin","Agent_commercial","Vendeur"],
+      "description": "List ventes with optional filters: type, dateDebut, dateFin, vendeurId",
+      "queryParams": [{"name":"type","required":false,"type":"VenteType"},{"name":"dateDebut","required":false,"format":"yyyy-MM-dd"},{"name":"dateFin","required":false,"format":"yyyy-MM-dd"},{"name":"vendeurId","required":false,"type":"string"}],
+      "response": {"200": ["Vente objects"]}
+    },
+    {
+      "group": "Ventes",
+      "path": "/api/ventes/{id}",
+      "method": "GET",
+      "authRequired": true,
+      "rolesAllowed": ["Admin","Agent_commercial","Vendeur"],
+      "pathParams": [{"name":"id","type":"string"}],
+      "response": {"200": "Vente object or 404"}
+    },
+    {
+      "group": "Admin",
+      "path": "/api/admin/whoami",
+      "method": "GET",
+      "authRequired": true,
+      "rolesAllowed": ["Admin"],
+      "response": {"200": {"username":"string","roles":"collection"}}
+    },
+    {
+      "group": "Admin",
+      "path": "/api/admin/stats",
+      "method": "GET",
+      "authRequired": true,
+      "rolesAllowed": ["Admin"],
+      "response": {"200": {"stats":"map"}}
+    }
+  ],
+  "models": {
+    "Bouteille": {"id":"Long","type":"Type","prix":"double","litrage":{"value":"double"}},
+    "Boite": {"id":"Long","type":"Type","prix":"double","quantite":"int","bouteilles":"List<Bouteille>"},
+    "Vente": {"id":"String (UUID)","dateVente":"Instant","type":"VenteType","vendeurId":"Long (helper)","montantTotal":"double","lignes":"List of Ligne"},
+    "Vente.Ligne": {"typeLigne":"string (BOITE|BOUTEILLE)","produitId":"string","quantite":"int","prixUnitaire":"double","sousTotal":"double"},
+    "WebhookSubscription": {"id":"Long","targetUrl":"string","active":"boolean","eventTypes":"Set<EventType>"}
+  },
+  "clientNotes": {
+    "authorization": "Include Authorization header 'Bearer <token>' for protected endpoints. Use /api/auth/login to obtain token; signup requires Admin role.",
+    "contentType": "application/json for request bodies",
+    "dateFilters": "Use yyyy-MM-dd format for dateDebut/dateFin query params when calling /api/ventes",
+    "pagination": "No pagination currently provided; clients should be prepared to handle full lists",
+    "webhooks": "Frontend should provide an endpoint to receive POST events if subscribing; webhooks send eventType and payload (stock or vente summary). Use /api/webhooks/subscriptions to register. For realtime UI, frontends can also poll endpoints on STOCK_CHANGED / vente events.",
+    "cors": "Server configured to allow CORS from all origins (use in-browser fetch from any origin)",
+    "usernameIsEmail": "Usernames are emails; use as login identifier"
+  }
+}
+
