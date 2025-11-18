@@ -14,7 +14,7 @@ target/
 .sts4-cache
 
 ### IntelliJ IDEA ###
-.idea
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -32,3 +32,17 @@ build/
 ### VS Code ###
 .vscode/
 src/main/resources/application.properties
+
+# Maven build output
+/target/
+
+# Environment files
+.env
+
+# Node
+/frontend/node_modules/
+ ../src/main/resources/application.properties
+terraform/.terraform
+terraform/terraform.tfstate
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate.backup

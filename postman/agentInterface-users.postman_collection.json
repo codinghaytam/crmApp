@@ -1,0 +1,153 @@
+{
+  "info": {
+    "name": "agentInterface - user setup",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0",
+    "description": "Requests to create/login three users: admin, commercial agent, vendeur. Note: creating Admin/Agent_commercial requires an Admin token (set {{admin_token}}) according to server-side rules."
+  },
+  "item": [
+    {
+      "name": "Signup - Vendeur",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nom\": \"Vendeur\",\n  \"prenom\": \"Test\",\n  \"email\": \"vendeur@example.com\",\n  \"password\": \"v3ndeurPass!\",\n  \"role\": \"Vendeur\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/signup",
+          "host": ["{{base_url}}"],
+          "path": ["api","auth","signup"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Login - Vendeur",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"vendeur@example.com\",\n  \"password\": \"v3ndeurPass!\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/login",
+          "host": ["{{base_url}}"],
+          "path": ["api","auth","login"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Signup - Agent Commercial (requires Admin token)",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{admin_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nom\": \"Agent\",\n  \"prenom\": \"Commercial\",\n  \"email\": \"commercial@example.com\",\n  \"password\": \"commPass!\",\n  \"role\": \"Agent_commercial\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/signup",
+          "host": ["{{base_url}}"],
+          "path": ["api","auth","signup"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Signup - Admin (requires Admin token)",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{admin_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nom\": \"Admin\",\n  \"prenom\": \"Setup\",\n  \"email\": \"admin@example.com\",\n  \"password\": \"Adm1nPass!\",\n  \"role\": \"Admin\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/signup",
+          "host": ["{{base_url}}"],
+          "path": ["api","auth","signup"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Login - Admin",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"admin@example.com\",\n  \"password\": \"Adm1nPass!\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/login",
+          "host": ["{{base_url}}"],
+          "path": ["api","auth","login"]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
+

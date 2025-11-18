@@ -10,10 +10,9 @@ FROM openjdk:17-jdk
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
-# Environment variables for PostgreSQL
-ENV SPRING_DATASOURCE_URL="jdbc:postgresql://ep-restless-surf-a9j3buon-pooler.gwc.azure.neon.tech/neondb?user=neondb_owner&password=npg_CVg2wv1lNtcT&sslmode=require&channelBinding=require"
-
+# Allow the SPRING_DATASOURCE_URL to be passed as a build-arg or runtime env variable
+ARG SPRING_DATASOURCE_URL
+ENV SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
 
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
-

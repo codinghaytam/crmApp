@@ -7,7 +7,8 @@ services:
       dockerfile: Dockerfile
     container_name: agent_backend
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://ep-restless-surf-a9j3buon-pooler.gwc.azure.neon.tech/neondb?user=neondb_owner&password=npg_CVg2wv1lNtcT&sslmode=require&channelBinding=require
+      # Provide SPRING_DATASOURCE_URL via environment or a .env file (do NOT hard-code secrets here)
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
     ports:
       - "8080:8080"
     networks:
